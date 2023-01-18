@@ -11,6 +11,8 @@
 #include <Adafruit_Sensor.h> // abstract functions for sensors
 #include <Adafruit_BME280.h> // specific code to access the BME280
 
+#include "TinyGPS++.h" // library to access GPS modules
+
 // Constants for the OLED Screen
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 64  // OLED display height, in pixels
@@ -33,10 +35,15 @@ TwoWire SENSORI2C = TwoWire(1); // second, seperate, I2C bus
 // create a global variable to hold our BME280 interface object
 Adafruit_BME280 bme;
 
+// declarations for GPS module
+#define GPSSERIALRX 36
+#define GPSSERIALTX 13
+TinyGPSPlus gps;
+
 /*
  * ===============================================================
  * End of global declarations\
-*/ 
+*/
 
 void setup() {
   // put your setup code here, to run once:
@@ -82,12 +89,12 @@ void setup() {
   display.println("Starting BME280...");
   display.display();
   SENSORI2C.begin(SENSOR_I2C_SDA, SENSOR_I2C_SCL, 400000);
-  bool status = bme.begin(0x76, &SENSORI2C);  
+  bool status = bme.begin(0x76, &SENSORI2C);
 
-  // Check that we can communicate with the sensor.
+    // Check that we can communicate with the sensor.
   // If we can't, output a message and go no further.
   // This kind of error handling is important.
-  // Can you find a similar example elsewhere in the code?
+  // Can you find a similar example elsewhere in the code?  
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
     display.println("No BME- check wiring!");
@@ -95,6 +102,11 @@ void setup() {
     while (1); // same as "while (true)" - i.e. do nothing more, forever
   }
 
+  // initialize the GPS module
+  Serial.println("Starting GPS...");
+  display.println("Starting GPS...");
+  display.display();
+  Serial1.begin(9600, SERIAL_8N1, GPSSERIALRX, GPSSERIALTX);
   
 }
 
@@ -108,6 +120,10 @@ void setup() {
 // BTW: a function allows you to break up your code, e.g. to allow the re-use of
 // some functionality from different parts of your program.
 void tempAndHumidityReading(void);
+void pressureReading(void);
+
+// create a variable to keep track of which "status screen" to display
+int statusScreen;
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -115,11 +131,29 @@ void loop() {
   // Output a message to the programmers computer so we know the code is running
   Serial.println("run...");
 
-  // get and display the current temperature and humidity
-  tempAndHumidityReading();
+  // switch statements let you choose different execution paths depending on the
+  // value of a variable. It's less typing/clearer than using many if/then statements.
+  switch(statusScreen) {
+    case 0:
+      // get and display the current temperature and humidity
+      tempAndHumidityReading();
+      break;
+    case 1:
+      pressureReading();
+      break;
+    //default:
+  }
+  // Show the next status screen next time
+  statusScreen++;
+
+  // We only have two status screens, so if we get to the third, go back to the first.
+  // NOTE: this may look a little odd- but remember we're counting from 0!
+  if(statusScreen>=2) {
+    statusScreen = 0;
+  }
 
   // wait a second before doing it all again
-  delay(1000);
+  delay(6000);
 }
 
 
@@ -153,4 +187,20 @@ void tempAndHumidityReading(){
   display.print(" %"); 
   
   display.display();  
+}
+
+// function to display the pressure
+void pressureReading(){
+  //clear display
+ display.clearDisplay();
+ //display pressure
+ display.setTextSize(1);
+ display.setCursor(0,0);
+ display.print("Pressure: ");
+ display.setTextSize(2);
+ display.setCursor(0,10);
+ display.print(String(bme.readPressure()));
+ display.print(" millibars");
+
+ display.display();
 }
